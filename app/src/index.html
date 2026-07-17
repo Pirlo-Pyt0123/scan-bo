@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Facturas</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Title Bar -->
+    <div class="title-bar">
+      <div class="title-bar-drag">
+        <span class="app-title">Scanner Facturas</span>
+      </div>
+      <div class="title-bar-controls">
+        <button class="title-btn minimize" id="btn-minimize"></button>
+        <button class="title-btn maximize" id="btn-maximize"></button>
+        <button class="title-btn close" id="btn-close"></button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Left - Camera -->
+      <div class="camera-section">
+        <div class="section-label">CAMARA</div>
+        <div class="video-container">
+          <canvas id="video-canvas" width="480" height="360"></canvas>
+          <div class="scan-indicator" id="scan-indicator">ESCANEANDO</div>
+        </div>
+        <div class="camera-controls">
+          <button class="btn btn-primary" id="btn-start">INICIAR</button>
+          <button class="btn btn-success" id="btn-upload" disabled>SUBIR A SIAT</button>
+        </div>
+      </div>
+
+      <!-- Right - Fields -->
+      <div class="fields-section">
+        <div class="section-label">DATOS ESCANEADOS</div>
+        <div class="fields-card">
+          <!-- NIT -->
+          <div class="field-row">
+            <label class="field-label">NIT</label>
+            <div class="field-input-group">
+              <input type="text" class="field-input" id="field-nit" value="---" readonly>
+              <button class="btn-edit" id="btn-edit-nit">EDITAR</button>
+            </div>
+          </div>
+
+          <!-- Numero de Factura -->
+          <div class="field-row">
+            <label class="field-label">No. FACTURA</label>
+            <input type="text" class="field-input" id="field-factura" value="---" readonly>
+          </div>
+
+          <!-- Numero de Autorizacion -->
+          <div class="field-row">
+            <label class="field-label">No. AUTORIZACION</label>
+            <input type="text" class="field-input" id="field-autorizacion" value="---" readonly>
+          </div>
+
+          <!-- Monto -->
+          <div class="field-row">
+            <label class="field-label">MONTO</label>
+            <input type="text" class="field-input" id="field-monto" value="---" readonly>
+          </div>
+
+          <!-- Estado -->
+          <div class="field-status" id="field-status">
+            Esperando escaneo...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom - History -->
+    <div class="history-section">
+      <div class="section-label">HISTORIAL</div>
+      <div class="history-list" id="history-list">
+        <div class="history-empty">Sin registros</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
