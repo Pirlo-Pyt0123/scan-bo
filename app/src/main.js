@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const siat = require('../siat');
 
 let mainWindow;
 let pythonProcess;
@@ -92,6 +93,34 @@ ipcMain.on('close-window', () => {
 app.whenReady().then(() => {
   createWindow();
   startPythonBackend();
+});
+
+ipcMain.handle('siat:has-credentials', () => {
+  return siat.hasCredentials();
+});
+
+ipcMain.handle('siat:save-credentials', (event, credentials) => {
+  siat.saveCredentials(credentials);
+  return { success: true };
+});
+
+ipcMain.handle('siat:get-credentials', () => {
+  return siat.loadCredentials();
+});
+
+ipcMain.handle('siat:upload', async (event, invoiceData) => {
+  const sendProgress = (progress) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('siat:progress', progress);
+    }
+  };
+
+  try {
+    await siat.uploadToSIAT(invoiceData, sendProgress);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 app.on('window-all-closed', () => {

@@ -32,6 +32,7 @@
         <div class="camera-controls">
           <button class="btn btn-primary" id="btn-start">INICIAR</button>
           <button class="btn btn-success" id="btn-upload" disabled>SUBIR A SIAT</button>
+          <button class="btn btn-settings" id="btn-siat-settings" title="Configurar credenciales SIAT"></button>
         </div>
       </div>
 
@@ -79,6 +80,34 @@
       <div class="section-label">HISTORIAL</div>
       <div class="history-list" id="history-list">
         <div class="history-empty">Sin registros</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIAT Credentials Modal -->
+  <div class="modal-overlay" id="modal-siat" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">Credenciales SIAT</span>
+        <button class="modal-close" id="btn-modal-close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="field-label">NIT / CI / CUR</label>
+          <input type="text" class="field-input" id="siat-identity" placeholder="NIT, CI o CUR">
+        </div>
+        <div class="modal-field">
+          <label class="field-label">Correo Electrónico</label>
+          <input type="email" class="field-input" id="siat-email" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="modal-field">
+          <label class="field-label">Contraseña</label>
+          <input type="password" class="field-input" id="siat-password" placeholder="Contraseña">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="modal-status" id="modal-status"></span>
+        <button class="btn btn-primary" id="btn-modal-save">GUARDAR</button>
       </div>
     </div>
   </div>
