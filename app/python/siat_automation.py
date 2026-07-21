@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import os
+import shutil
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
@@ -54,9 +55,14 @@ def main():
     try:
         send_json({'type': 'progress', 'step': 'login', 'message': 'Iniciando Firefox...', 'current': 0, 'total': len(invoices)})
 
+        firefox_path = shutil.which('firefox') or shutil.which('firefox-esr')
+        if not firefox_path:
+            send_json({'type': 'error', 'message': 'No se encontro Firefox instalado en este equipo. Es necesario para subir facturas al SIAT.'})
+            return
+
         options = Options()
         options.add_argument('--private')
-        options.binary_location = '/usr/local/bin/firefox'
+        options.binary_location = firefox_path
 
         service = Service(GeckoDriverManager().install())
         driver = webdriver.Firefox(service=service, options=options)
@@ -73,7 +79,17 @@ def main():
         driver.find_element(By.ID, 'password').send_keys(credentials.get('password', ''))
         driver.find_element(By.ID, 'kc-login').click()
 
-        time.sleep(4)
+        # Si el login funciona, el SIAT navega fuera de la pantalla de login y
+        # el boton 'kc-login' deja de estar presente/visible. Si las
+        # credenciales son incorrectas, Keycloak vuelve a mostrar el mismo
+        # formulario con un error, asi que el boton sigue ahi.
+        try:
+            WebDriverWait(driver, 8).until(
+                EC.invisibility_of_element_located((By.ID, 'kc-login'))
+            )
+        except TimeoutException:
+            send_json({'type': 'error', 'message': 'No se pudo iniciar sesion en el SIAT. Verifica tu NIT/CI, correo y contraseña.'})
+            return
 
         send_json({'type': 'progress', 'step': 'navigate', 'message': 'Buscando Aplicaciones...', 'current': 0, 'total': len(invoices)})
 
