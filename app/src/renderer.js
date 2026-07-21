@@ -22,7 +22,16 @@ const elements = {
   cameraModal: document.getElementById('camera-modal'),
   cameraModalBody: document.getElementById('camera-modal-body'),
   cameraModalLoading: document.getElementById('camera-modal-loading'),
-  cameraModalClose: document.getElementById('camera-modal-close')
+  cameraModalClose: document.getElementById('camera-modal-close'),
+  btnSiatSettings: document.getElementById('btn-siat-settings'),
+  btnTestData: document.getElementById('btn-test-data'),
+  modalSiat: document.getElementById('modal-siat'),
+  btnModalClose: document.getElementById('btn-modal-close'),
+  btnModalSave: document.getElementById('btn-modal-save'),
+  siatIdentity: document.getElementById('siat-identity'),
+  siatEmail: document.getElementById('siat-email'),
+  siatPassword: document.getElementById('siat-password'),
+  modalStatus: document.getElementById('modal-status')
 };
 
 const ctx = elements.videoCanvas.getContext('2d');
@@ -259,20 +268,69 @@ function toggleEditNit() {
   }
 }
 
-function uploadToSIAT() {
-  if (!state.currentData) return;
+async function uploadToSIAT() {
+  if (state.history.length === 0) return;
 
-  state.currentData.nit = elements.fieldNit.value;
-  state.currentData.monto = elements.fieldMonto.value;
+  const hasCreds = await ipcRenderer.invoke('siat:has-credentials');
+  if (!hasCreds) {
+    elements.siatIdentity.value = '';
+    elements.siatEmail.value = '';
+    elements.siatPassword.value = '';
+    openSiatModal('Debe registrar sus credenciales SIAT antes de subir', true);
+    return;
+  }
 
-  ipcRenderer.send('send-command', {
-    type: 'upload_siat',
-    data: state.currentData
-  });
+  const invoices = state.history.map(item => ({
+    autorizacion: item.autorizacion,
+    factura: item.factura,
+    nit: item.nit,
+    monto: item.monto
+  }));
 
   elements.btnUpload.textContent = 'SUBIENDO...';
   elements.btnUpload.classList.add('uploading');
   elements.btnUpload.disabled = true;
+  setFieldStatus(`Subiendo ${invoices.length} factura(s) a SIAT...`, '');
+
+  const result = await ipcRenderer.invoke('siat:upload-batch', invoices);
+
+  elements.btnUpload.textContent = 'SUBIR A SIAT';
+  elements.btnUpload.classList.remove('uploading');
+  elements.btnUpload.disabled = false;
+
+  if (result.success) {
+    setFieldStatus(`¡${invoices.length} factura(s) subida(s) correctamente!`, 'uploaded');
+  } else {
+    setFieldStatus('ERROR: ' + (result.error || 'Error al subir'), '');
+  }
+}
+
+function openSiatModal(message, isError) {
+  elements.modalSiat.style.display = 'flex';
+  elements.modalStatus.textContent = message || '';
+  elements.modalStatus.className = 'modal-status' + (isError ? ' error' : '');
+  elements.siatIdentity.focus();
+}
+
+function closeSiatModal() {
+  elements.modalSiat.style.display = 'none';
+}
+
+async function injectTestData() {
+  const fakeInvoices = await ipcRenderer.invoke('siat:get-fake');
+  for (const inv of fakeInvoices) {
+    addToHistory(inv);
+  }
+  if (fakeInvoices.length > 0) {
+    const last = fakeInvoices[fakeInvoices.length - 1];
+    elements.fieldAutorizacion.value = last.autorizacion;
+    elements.fieldFactura.value = last.factura;
+    elements.fieldNit.value = last.nit;
+    elements.fieldMonto.value = last.monto;
+    state.currentData = { ...last };
+    elements.btnUpload.disabled = false;
+    setFieldStatus('Datos de prueba cargados', 'scanned');
+  }
 }
 
 // Event Listeners
@@ -298,6 +356,45 @@ elements.cameraModal.addEventListener('click', (e) => {
 });
 document.querySelector('.camera-option-auto').addEventListener('click', () => selectCamera(null));
 
+elements.btnSiatSettings.addEventListener('click', async () => {
+  const creds = await ipcRenderer.invoke('siat:get-credentials');
+  if (creds) {
+    elements.siatIdentity.value = creds.identity || '';
+    elements.siatEmail.value = creds.email || '';
+    elements.siatPassword.value = creds.password || '';
+    openSiatModal('Modificar credenciales');
+  } else {
+    elements.siatIdentity.value = '';
+    elements.siatEmail.value = '';
+    elements.siatPassword.value = '';
+    openSiatModal('Ingrese sus credenciales SIAT');
+  }
+});
+
+elements.btnModalClose.addEventListener('click', closeSiatModal);
+elements.modalSiat.addEventListener('click', (e) => {
+  if (e.target === elements.modalSiat) closeSiatModal();
+});
+
+elements.btnModalSave.addEventListener('click', async () => {
+  const identity = elements.siatIdentity.value.trim();
+  const email = elements.siatEmail.value.trim();
+  const password = elements.siatPassword.value.trim();
+
+  if (!identity || !email || !password) {
+    elements.modalStatus.textContent = 'Todos los campos son obligatorios';
+    elements.modalStatus.className = 'modal-status error';
+    return;
+  }
+
+  await ipcRenderer.invoke('siat:save-credentials', { identity, email, password });
+  elements.modalStatus.textContent = 'Credenciales guardadas correctamente';
+  elements.modalStatus.className = 'modal-status';
+  setTimeout(closeSiatModal, 1200);
+});
+
+elements.btnTestData.addEventListener('click', injectTestData);
+
 elements.fieldNit.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && state.nitEditing) {
     toggleEditNit();
@@ -305,6 +402,13 @@ elements.fieldNit.addEventListener('keydown', (e) => {
 });
 
 // IPC Handlers
+ipcRenderer.on('siat:progress', (event, progress) => {
+  setFieldStatus(progress.message || 'Procesando...', '');
+  if (progress.current && progress.total) {
+    elements.btnUpload.textContent = `SUBIENDO ${progress.current}/${progress.total}`;
+  }
+});
+
 ipcRenderer.on('python-data', (event, data) => {
   switch (data.type) {
     case 'video_frame':

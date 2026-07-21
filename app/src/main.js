@@ -1,6 +1,9 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const siat = require('../siat');
+const PYTHON = path.join(__dirname, '../../venv/bin/python3');
+const SIAT_SCRIPT = path.join(__dirname, '../python/siat_automation.py');
 
 // El AppImage no incluye chrome-sandbox con permisos setuid-root, asi que el
 // sandbox de Chromium no puede inicializarse. La app solo carga HTML propio
@@ -129,6 +132,88 @@ ipcMain.on('close-window', () => {
 app.whenReady().then(() => {
   createWindow();
   startPythonBackend();
+});
+
+ipcMain.handle('siat:has-credentials', () => {
+  return siat.hasCredentials();
+});
+
+ipcMain.handle('siat:save-credentials', (event, credentials) => {
+  siat.saveCredentials(credentials);
+  return { success: true };
+});
+
+ipcMain.handle('siat:get-credentials', () => {
+  return siat.loadCredentials();
+});
+
+ipcMain.handle('siat:upload-batch', async (event, invoices) => {
+  return new Promise((resolve) => {
+    const credentials = siat.loadCredentials();
+    if (!credentials) {
+      resolve({ success: false, error: 'No hay credenciales guardadas' });
+      return;
+    }
+
+    const payload = JSON.stringify({ credentials, invoices }) + '\n';
+    const proc = spawn(PYTHON, [SIAT_SCRIPT], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let buffer = '';
+    let resolved = false;
+
+    proc.stdout.on('data', (data) => {
+      buffer += data.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === 'progress' && mainWindow) {
+            mainWindow.webContents.send('siat:progress', msg);
+          } else if (msg.type === 'success' && !resolved) {
+            resolved = true;
+            resolve({ success: true });
+          } else if (msg.type === 'error' && !resolved) {
+            resolved = true;
+            resolve({ success: false, error: msg.message });
+          }
+        } catch (e) {}
+      }
+    });
+
+    proc.stderr.on('data', (data) => {
+      console.error('SIAT Python:', data.toString());
+    });
+
+    proc.on('close', (code) => {
+      if (!resolved) {
+        resolved = true;
+        if (code !== 0) {
+          resolve({ success: false, error: `Proceso terminó con código ${code}` });
+        } else {
+          resolve({ success: true });
+        }
+      }
+    });
+
+    proc.on('error', (err) => {
+      if (!resolved) {
+        resolved = true;
+        resolve({ success: false, error: err.message });
+      }
+    });
+
+    proc.stdin.write(payload);
+    proc.stdin.end();
+  });
+});
+
+ipcMain.handle('siat:get-fake', () => {
+  return siat.FAKE_INVOICES;
 });
 
 app.on('window-all-closed', () => {
