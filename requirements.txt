@@ -1,3 +1,10 @@
 # Dependencias para scan-bo
 opencv-python>=4.8.0
 numpy>=1.24.0
+
+# Automatizacion SIAT (siat_automation.py)
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+
+# Empaquetado a ejecutable standalone (build:backend / build:siat en package.json)
+pyinstaller>=6.0.0

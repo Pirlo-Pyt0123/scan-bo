@@ -14,6 +14,9 @@ const elements = {
   fieldStatusText: document.getElementById('field-status-text'),
   historyList: document.getElementById('history-list'),
   historyCount: document.getElementById('history-count'),
+  tabTigo: document.getElementById('tab-tigo'),
+  tabEntel: document.getElementById('tab-entel'),
+  historyEmpresaTitle: document.getElementById('history-empresa-title'),
   btnStart: document.getElementById('btn-start'),
   btnUpload: document.getElementById('btn-upload'),
   btnEditNit: document.getElementById('btn-edit-nit'),
@@ -40,12 +43,15 @@ const savedCameraIndex = localStorage.getItem('scanbo_camera_index');
 
 let state = {
   isRunning: false,
-  history: [],
+  records: [],
+  selectedEmpresa: 'tigo',
   currentData: null,
   nitEditing: false,
   hasFrame: false,
   selectedCamera: savedCameraIndex !== null ? parseInt(savedCameraIndex) : null
 };
+
+const EMPRESA_LABELS = { tigo: 'TIGO', entel: 'ENTEL', otro: 'sin clasificar' };
 
 updateCameraLabel();
 
@@ -89,11 +95,9 @@ function showResult(fields) {
     elements.fieldMonto.value = fields.monto;
   }
 
-  setFieldStatus('QR ESCANEADO CORRECTAMENTE', 'scanned');
-
   elements.btnUpload.disabled = false;
 
-  addToHistory(fields);
+  saveCurrentRecord();
 }
 
 function setFieldStatus(text, variant) {
@@ -111,45 +115,67 @@ function hideBackendError() {
   elements.statusBanner.classList.remove('visible');
 }
 
-function addToHistory(fields) {
-  const exists = state.history.some(item =>
-    item.autorizacion === fields.autorizacion && item.factura === fields.factura
-  );
-  if (exists) return;
+async function saveCurrentRecord() {
+  const fields = {
+    autorizacion: elements.fieldAutorizacion.value,
+    factura: elements.fieldFactura.value,
+    nit: elements.fieldNit.value,
+    monto: elements.fieldMonto.value
+  };
 
-  const now = new Date();
-  const time = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const result = await ipcRenderer.invoke('db:save-invoice', fields);
 
-  state.history.unshift({ ...fields, time });
+  if (!result.success) {
+    setFieldStatus('Error al guardar: ' + result.error, '');
+    return;
+  }
 
-  if (state.history.length > 50) state.history.pop();
+  setFieldStatus(`QR ESCANEADO - ${EMPRESA_LABELS[result.empresa]}`, 'scanned');
 
+  if (result.empresa === state.selectedEmpresa) {
+    loadRecords(state.selectedEmpresa);
+  }
+}
+
+async function loadRecords(empresa) {
+  state.records = await ipcRenderer.invoke('db:get-invoices', empresa);
   renderHistory();
 }
 
-function renderHistory() {
-  elements.historyCount.textContent = state.history.length;
+function switchEmpresa(empresa) {
+  state.selectedEmpresa = empresa;
+  elements.tabTigo.classList.toggle('selected', empresa === 'tigo');
+  elements.tabEntel.classList.toggle('selected', empresa === 'entel');
+  elements.historyEmpresaTitle.textContent = EMPRESA_LABELS[empresa];
+  loadRecords(empresa);
+}
 
-  if (state.history.length === 0) {
+function renderHistory() {
+  elements.historyCount.textContent = state.records.length;
+
+  if (state.records.length === 0) {
     elements.historyList.innerHTML = '<div class="history-empty">Sin registros</div>';
     return;
   }
 
-  elements.historyList.innerHTML = state.history.map((item, index) => `
+  elements.historyList.innerHTML = state.records.map((item, index) => {
+    const time = new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return `
     <div class="history-item" data-index="${index}">
-      <span class="history-item-num">${state.history.length - index}</span>
-      <span class="history-item-time">${item.time}</span>
+      <span class="history-item-num">${state.records.length - index}</span>
+      <span class="history-item-time">${time}</span>
       <span class="history-item-nit">Aut: ${item.autorizacion}</span>
       <span class="history-item-factura">Fact: ${item.factura}</span>
       <span class="history-item-monto">${item.monto !== '---' ? 'Bs. ' + item.monto : '---'}</span>
       <span class="history-item-status">OK</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   document.querySelectorAll('.history-item').forEach(item => {
     item.addEventListener('click', () => {
       const index = parseInt(item.dataset.index);
-      const entry = state.history[index];
+      const entry = state.records[index];
       if (entry) {
         elements.fieldAutorizacion.value = entry.autorizacion;
         elements.fieldFactura.value = entry.factura;
@@ -269,7 +295,7 @@ function toggleEditNit() {
 }
 
 async function uploadToSIAT() {
-  if (state.history.length === 0) return;
+  if (state.records.length === 0) return;
 
   const hasCreds = await ipcRenderer.invoke('siat:has-credentials');
   if (!hasCreds) {
@@ -280,7 +306,7 @@ async function uploadToSIAT() {
     return;
   }
 
-  const invoices = state.history.map(item => ({
+  const invoices = state.records.map(item => ({
     autorizacion: item.autorizacion,
     factura: item.factura,
     nit: item.nit,
@@ -290,7 +316,7 @@ async function uploadToSIAT() {
   elements.btnUpload.textContent = 'SUBIENDO...';
   elements.btnUpload.classList.add('uploading');
   elements.btnUpload.disabled = true;
-  setFieldStatus(`Subiendo ${invoices.length} factura(s) a SIAT...`, '');
+  setFieldStatus(`Subiendo ${invoices.length} factura(s) de ${EMPRESA_LABELS[state.selectedEmpresa]} a SIAT...`, '');
 
   const result = await ipcRenderer.invoke('siat:upload-batch', invoices);
 
@@ -319,8 +345,9 @@ function closeSiatModal() {
 async function injectTestData() {
   const fakeInvoices = await ipcRenderer.invoke('siat:get-fake');
   for (const inv of fakeInvoices) {
-    addToHistory(inv);
+    await ipcRenderer.invoke('db:save-invoice', inv);
   }
+  await loadRecords(state.selectedEmpresa);
   if (fakeInvoices.length > 0) {
     const last = fakeInvoices[fakeInvoices.length - 1];
     elements.fieldAutorizacion.value = last.autorizacion;
@@ -387,13 +414,20 @@ elements.btnModalSave.addEventListener('click', async () => {
     return;
   }
 
-  await ipcRenderer.invoke('siat:save-credentials', { identity, email, password });
+  const result = await ipcRenderer.invoke('siat:save-credentials', { identity, email, password });
+  if (!result.success) {
+    elements.modalStatus.textContent = result.error || 'No se pudieron guardar las credenciales';
+    elements.modalStatus.className = 'modal-status error';
+    return;
+  }
   elements.modalStatus.textContent = 'Credenciales guardadas correctamente';
   elements.modalStatus.className = 'modal-status';
   setTimeout(closeSiatModal, 1200);
 });
 
 elements.btnTestData.addEventListener('click', injectTestData);
+elements.tabTigo.addEventListener('click', () => switchEmpresa('tigo'));
+elements.tabEntel.addEventListener('click', () => switchEmpresa('entel'));
 
 elements.fieldNit.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && state.nitEditing) {
@@ -447,4 +481,12 @@ ipcRenderer.on('python-data', (event, data) => {
 });
 
 // Initialize
-renderHistory();
+loadRecords(state.selectedEmpresa);
+
+// El boton TEST inyecta facturas falsas para probar la UI - solo tiene
+// sentido en desarrollo, no debe quedar visible en el ejecutable final.
+ipcRenderer.invoke('app:is-packaged').then(isPackaged => {
+  if (isPackaged) {
+    elements.btnTestData.style.display = 'none';
+  }
+});

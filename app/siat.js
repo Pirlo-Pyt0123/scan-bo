@@ -1,9 +1,13 @@
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const { app, safeStorage } = require('electron');
 
-const CREDENTIALS_FILE = 'siat-credentials.json';
+// Nombre nuevo (.enc) a proposito: el formato anterior (siat-credentials.json)
+// usaba una clave derivada de una ruta predecible (app.getPath('userData')),
+// que cualquiera con acceso al archivo podia recalcular en dos lineas de
+// codigo. safeStorage usa el llavero real del sistema operativo (gnome-keyring
+// / kwallet / DPAPI segun la plataforma), asi que no hay clave que adivinar.
+const CREDENTIALS_FILE = 'siat-credentials.enc';
 
 const FAKE_INVOICES = [
   { autorizacion: '12345678901234', factura: 'FAC-001', nit: '1024549028', monto: '150.50' },
@@ -15,50 +19,25 @@ function getCredentialsPath() {
   return path.join(app.getPath('userData'), CREDENTIALS_FILE);
 }
 
-function getKey() {
-  return crypto.createHash('sha256').update(app.getPath('userData')).digest();
-}
-
-function encrypt(text) {
-  const key = getKey();
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return iv.toString('hex') + ':' + encrypted + ':' + cipher.getAuthTag().toString('hex');
-}
-
-function decrypt(encryptedText) {
-  const parts = encryptedText.split(':');
-  const iv = Buffer.from(parts[0], 'hex');
-  const encrypted = parts[1];
-  const authTag = Buffer.from(parts[2], 'hex');
-  const key = getKey();
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
-}
-
 function saveCredentials(credentials) {
-  try {
-    const json = JSON.stringify(credentials);
-    const encrypted = encrypt(json);
-    fs.writeFileSync(getCredentialsPath(), encrypted, 'utf8');
-    console.log('Credenciales guardadas en:', getCredentialsPath());
-  } catch (e) {
-    console.error('Error al guardar credenciales:', e);
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('El cifrado de credenciales no esta disponible en este equipo (falta un llavero del sistema operativo)');
   }
+  const json = JSON.stringify(credentials);
+  const encrypted = safeStorage.encryptString(json);
+  fs.writeFileSync(getCredentialsPath(), encrypted);
 }
 
 function loadCredentials() {
   try {
     const p = getCredentialsPath();
     if (!fs.existsSync(p)) return null;
-    const encrypted = fs.readFileSync(p, 'utf8');
-    const decrypted = decrypt(encrypted);
-    console.log('Credenciales cargadas desde:', p);
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.error('safeStorage no disponible: no se pueden leer las credenciales guardadas');
+      return null;
+    }
+    const encrypted = fs.readFileSync(p);
+    const decrypted = safeStorage.decryptString(encrypted);
     return JSON.parse(decrypted);
   } catch (e) {
     console.error('Error al cargar credenciales:', e);

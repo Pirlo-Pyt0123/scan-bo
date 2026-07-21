@@ -6,8 +6,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "postinstall": "electron-builder install-app-deps",
     "build:backend": "../venv/bin/pyinstaller --onefile --name backend --clean --distpath python/dist --workpath python/build --specpath python python/backend.py",
-    "dist:linux": "pnpm run build:backend && electron-builder --linux AppImage"
+    "build:siat": "../venv/bin/pyinstaller --onefile --name siat_automation --clean --distpath python/dist --workpath python/build --specpath python --collect-all selenium --collect-all webdriver_manager python/siat_automation.py",
+    "dist:linux": "pnpm run build:backend && pnpm run build:siat && electron-builder --linux AppImage"
   },
   "author": "",
   "license": "MIT",
@@ -23,13 +25,19 @@
     },
     "files": [
       "src/**/*",
-      "assets/icon.png",
+      "siat.js",
+      "db.js",
+      "assets/*.png",
       "!python/**"
     ],
     "extraResources": [
       {
         "from": "python/dist/backend",
         "to": "backend/backend"
+      },
+      {
+        "from": "python/dist/siat_automation",
+        "to": "backend/siat_automation"
       }
     ],
     "linux": {
@@ -41,5 +49,8 @@
       "target": "nsis",
       "icon": "assets/icon.png"
     }
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1"
   }
 }

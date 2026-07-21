@@ -2,8 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const siat = require('../siat');
-const PYTHON = path.join(__dirname, '../../venv/bin/python3');
-const SIAT_SCRIPT = path.join(__dirname, '../python/siat_automation.py');
+const db = require('../db');
 
 // El AppImage no incluye chrome-sandbox con permisos setuid-root, asi que el
 // sandbox de Chromium no puede inicializarse. La app solo carga HTML propio
@@ -15,6 +14,15 @@ app.commandLine.appendSwitch('no-sandbox');
 // varios segundos reintentando antes de caer a render por software; evitamos
 // ese ciclo arrancando directo en software.
 app.disableHardwareAcceleration();
+
+// safeStorage (usado para cifrar las credenciales del SIAT) detecta el
+// backend de llavero segun XDG_CURRENT_DESKTOP. En escritorios que no son
+// GNOME/KDE "de fabrica" (tiling WMs como niri, sway, i3, etc.) esa deteccion
+// falla aunque gnome-keyring este corriendo, y isEncryptionAvailable()
+// devuelve false. Forzamos el backend real de libsecret explicitamente.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('password-store', 'gnome-libsecret');
+}
 
 let mainWindow;
 let pythonProcess;
@@ -63,6 +71,21 @@ function getBackendCommand() {
     : path.join(__dirname, '../../venv/bin/python3');
 
   return { command: venvPython, args: [pythonScript] };
+}
+
+function getSiatCommand() {
+  if (app.isPackaged) {
+    // Binario standalone empaquetado por PyInstaller (ver electron-builder.extraResources)
+    const binName = process.platform === 'win32' ? 'siat_automation.exe' : 'siat_automation';
+    return { command: path.join(process.resourcesPath, 'backend', binName), args: [] };
+  }
+
+  const script = path.join(__dirname, '../python/siat_automation.py');
+  const venvPython = process.platform === 'win32'
+    ? path.join(__dirname, '../../venv/Scripts/python.exe')
+    : path.join(__dirname, '../../venv/bin/python3');
+
+  return { command: venvPython, args: [script] };
 }
 
 function startPythonBackend() {
@@ -129,6 +152,21 @@ ipcMain.on('close-window', () => {
   if (mainWindow) mainWindow.close();
 });
 
+ipcMain.handle('app:is-packaged', () => app.isPackaged);
+
+ipcMain.handle('db:save-invoice', (event, fields) => {
+  try {
+    const empresa = db.saveInvoice(fields);
+    return { success: true, empresa };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('db:get-invoices', (event, empresa) => {
+  return db.getInvoicesByEmpresa(empresa);
+});
+
 app.whenReady().then(() => {
   createWindow();
   startPythonBackend();
@@ -139,8 +177,12 @@ ipcMain.handle('siat:has-credentials', () => {
 });
 
 ipcMain.handle('siat:save-credentials', (event, credentials) => {
-  siat.saveCredentials(credentials);
-  return { success: true };
+  try {
+    siat.saveCredentials(credentials);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 });
 
 ipcMain.handle('siat:get-credentials', () => {
@@ -156,7 +198,8 @@ ipcMain.handle('siat:upload-batch', async (event, invoices) => {
     }
 
     const payload = JSON.stringify({ credentials, invoices }) + '\n';
-    const proc = spawn(PYTHON, [SIAT_SCRIPT], {
+    const { command, args } = getSiatCommand();
+    const proc = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
