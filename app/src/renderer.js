@@ -44,7 +44,7 @@ const savedCameraIndex = localStorage.getItem('scanbo_camera_index');
 let state = {
   isRunning: false,
   records: [],
-  selectedEmpresa: 'tigo',
+  selectedEmpresa: 'entel',
   currentData: null,
   nitEditing: false,
   hasFrame: false,
@@ -142,11 +142,18 @@ async function loadRecords(empresa) {
   renderHistory();
 }
 
-function switchEmpresa(empresa) {
+async function switchEmpresa(empresa) {
   state.selectedEmpresa = empresa;
   elements.tabTigo.classList.toggle('selected', empresa === 'tigo');
   elements.tabEntel.classList.toggle('selected', empresa === 'entel');
   elements.historyEmpresaTitle.textContent = EMPRESA_LABELS[empresa];
+
+  const nit = await ipcRenderer.invoke('db:get-empresa-nit', empresa);
+  if (nit) {
+    elements.fieldNit.value = nit;
+    flashField(elements.fieldNit);
+  }
+
   loadRecords(empresa);
 }
 
@@ -481,7 +488,7 @@ ipcRenderer.on('python-data', (event, data) => {
 });
 
 // Initialize
-loadRecords(state.selectedEmpresa);
+switchEmpresa(state.selectedEmpresa);
 
 // El boton TEST inyecta facturas falsas para probar la UI - solo tiene
 // sentido en desarrollo, no debe quedar visible en el ejecutable final.

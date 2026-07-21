@@ -167,6 +167,10 @@ ipcMain.handle('db:get-invoices', (event, empresa) => {
   return db.getInvoicesByEmpresa(empresa);
 });
 
+ipcMain.handle('db:get-empresa-nit', (event, empresa) => {
+  return db.EMPRESA_NIT[empresa] || null;
+});
+
 app.whenReady().then(() => {
   createWindow();
   startPythonBackend();
