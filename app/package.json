@@ -5,11 +5,41 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "build:backend": "../venv/bin/pyinstaller --onefile --name backend --clean --distpath python/dist --workpath python/build --specpath python python/backend.py",
+    "dist:linux": "pnpm run build:backend && electron-builder --linux AppImage"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "bo.scanbo.app",
+    "productName": "Scanner Facturas",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/icon.png",
+      "!python/**"
+    ],
+    "extraResources": [
+      {
+        "from": "python/dist/backend",
+        "to": "backend/backend"
+      }
+    ],
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Office"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    }
   }
 }

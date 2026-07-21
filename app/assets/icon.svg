@@ -1,0 +1,51 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eef0fb"/>
+      <stop offset="100%" stop-color="#dfe1f5"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="scan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#22c55e" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+
+  <g transform="translate(96,96)">
+    <rect width="320" height="320" rx="48" fill="#ffffff" opacity="0.6"/>
+
+    <!-- QR corner markers -->
+    <g fill="url(#accent)">
+      <rect x="24" y="24" width="88" height="88" rx="20"/>
+      <rect x="208" y="24" width="88" height="88" rx="20"/>
+      <rect x="24" y="208" width="88" height="88" rx="20"/>
+    </g>
+    <g fill="#ffffff">
+      <rect x="46" y="46" width="44" height="44" rx="10"/>
+      <rect x="230" y="46" width="44" height="44" rx="10"/>
+      <rect x="46" y="230" width="44" height="44" rx="10"/>
+    </g>
+    <g fill="url(#accent)">
+      <rect x="60" y="60" width="16" height="16" rx="4"/>
+      <rect x="244" y="60" width="16" height="16" rx="4"/>
+      <rect x="60" y="244" width="16" height="16" rx="4"/>
+    </g>
+
+    <!-- small data dots bottom-right cluster -->
+    <g fill="url(#accent)">
+      <rect x="208" y="208" width="32" height="32" rx="8"/>
+      <rect x="256" y="208" width="32" height="32" rx="8"/>
+      <rect x="208" y="256" width="32" height="32" rx="8"/>
+      <rect x="264" y="264" width="24" height="24" rx="6"/>
+    </g>
+
+    <!-- scan line -->
+    <rect x="0" y="150" width="320" height="10" rx="5" fill="url(#scan)"/>
+  </g>
+</svg>

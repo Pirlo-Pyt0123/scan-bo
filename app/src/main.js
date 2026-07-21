@@ -2,6 +2,17 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
+// El AppImage no incluye chrome-sandbox con permisos setuid-root, asi que el
+// sandbox de Chromium no puede inicializarse. La app solo carga HTML propio
+// (nunca contenido remoto), asi que deshabilitarlo aqui es seguro.
+app.commandLine.appendSwitch('no-sandbox');
+
+// La app solo pinta interfaz plana y un canvas 2D, no necesita GPU. En algunos
+// equipos el proceso de GPU falla al iniciar (driver Intel) y Electron gasta
+// varios segundos reintentando antes de caer a render por software; evitamos
+// ese ciclo arrancando directo en software.
+app.disableHardwareAcceleration();
+
 let mainWindow;
 let pythonProcess;
 
@@ -12,7 +23,8 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     frame: false,
-    backgroundColor: '#0d0d12',
+    backgroundColor: '#eef0f7',
+    icon: path.join(__dirname, '../assets/icon.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -29,11 +41,31 @@ function createWindow() {
   });
 }
 
-function startPythonBackend() {
+function sendToRenderer(json) {
+  if (mainWindow) {
+    mainWindow.webContents.send('python-data', json);
+  }
+}
+
+function getBackendCommand() {
+  if (app.isPackaged) {
+    // Binario standalone empaquetado por PyInstaller (ver electron-builder.extraResources)
+    const binName = process.platform === 'win32' ? 'backend.exe' : 'backend';
+    return { command: path.join(process.resourcesPath, 'backend', binName), args: [] };
+  }
+
   const pythonScript = path.join(__dirname, '../python/backend.py');
-  const pythonPath = path.join(__dirname, '../../venv/bin/python3');
-  
-  pythonProcess = spawn(pythonPath, [pythonScript], {
+  const venvPython = process.platform === 'win32'
+    ? path.join(__dirname, '../../venv/Scripts/python.exe')
+    : path.join(__dirname, '../../venv/bin/python3');
+
+  return { command: venvPython, args: [pythonScript] };
+}
+
+function startPythonBackend() {
+  const { command, args } = getBackendCommand();
+
+  pythonProcess = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe']
   });
 
@@ -43,14 +75,11 @@ function startPythonBackend() {
     buffer += data.toString();
     const lines = buffer.split('\n');
     buffer = lines.pop();
-    
+
     for (const line of lines) {
       if (line.trim()) {
         try {
-          const json = JSON.parse(line);
-          if (mainWindow) {
-            mainWindow.webContents.send('python-data', json);
-          }
+          sendToRenderer(JSON.parse(line));
         } catch (e) {}
       }
     }
@@ -60,8 +89,16 @@ function startPythonBackend() {
     console.error('Python:', data.toString());
   });
 
+  pythonProcess.on('error', (err) => {
+    console.error('No se pudo iniciar el backend:', err);
+    sendToRenderer({ type: 'error', message: 'No se pudo iniciar el backend de camara' });
+  });
+
   pythonProcess.on('close', (code) => {
     console.log(`Python exited: ${code}`);
+    if (code !== 0 && code !== null) {
+      sendToRenderer({ type: 'error', message: 'El backend de camara se detuvo inesperadamente' });
+    }
   });
 }
 

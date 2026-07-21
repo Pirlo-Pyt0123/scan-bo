@@ -12,10 +12,15 @@ node_modules/
 package-lock.json
 pnpm-lock.yaml
 
+# Electron build output (AppImage, unpacked binaries, PyInstaller spec)
+release/
+*.spec
+
 # Captures
 capturas/
 *.jpg
 *.png
+!app/assets/*.png
 
 # IDE
 .vscode/

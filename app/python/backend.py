@@ -4,8 +4,9 @@ Backend Python para Scanner Facturas
 Solo QR - Extrae Autorizacion (14 chars) y Factura (resto)
 """
 import os
-os.environ["QT_QPA_PLATFORM"] = "xcb"
 import sys
+if sys.platform.startswith('linux'):
+    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 import json
 import cv2
 import numpy as np
@@ -31,18 +32,44 @@ class CameraBackend:
         self.undistort_enabled = True
         self.K = None
         
-    def init_camera(self, camera_index=1):
-        self.cap = cv2.VideoCapture(camera_index)
-        if not self.cap.isOpened():
-            self.cap = cv2.VideoCapture(0)
-            if not self.cap.isOpened():
-                self.send_error("No se pudo abrir la webcam")
-                return False
-        
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        return True
-    
+    def init_camera(self, camera_index=None):
+        if camera_index is not None:
+            candidates = [camera_index]
+        else:
+            env_index = os.environ.get('SCANBO_CAMERA_INDEX')
+            candidates = [int(env_index)] if env_index else [0, 1, 2]
+
+        for index in candidates:
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                ok, _ = cap.read()
+                if ok:
+                    self.cap = cap
+                    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    return True
+            cap.release()
+
+        self.send_error("No se encontro ninguna camara disponible")
+        return False
+
+    def list_cameras(self):
+        found = []
+        for index in range(5):
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok:
+                    thumb = cv2.resize(frame, (160, 120))
+                    _, buffer = cv2.imencode('.jpg', thumb, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    found.append({
+                        'index': index,
+                        'thumbnail': base64.b64encode(buffer).decode('utf-8')
+                    })
+            cap.release()
+
+        self.send_json({'type': 'camera_list', 'cameras': found})
+
     def send_json(self, data):
         try:
             sys.stdout.write(json.dumps(data) + '\n')
@@ -136,19 +163,27 @@ class CameraBackend:
         
         return frame
     
-    def run(self):
-        if not self.init_camera(1):
-            self.send_error("No se encontro webcam")
+    def run(self, camera_index=None):
+        if not self.init_camera(camera_index):
+            self.running = False
             return
-        
+
+        self.send_json({'type': 'camera_ready'})
         self.running = True
-        
+        consecutive_failures = 0
+
         while self.running:
             ret, frame = self.cap.read()
             if not ret:
+                consecutive_failures += 1
+                if consecutive_failures > 60:
+                    self.send_error("Se perdio la conexion con la camara")
+                    self.running = False
+                    break
                 time.sleep(0.1)
                 continue
-            
+
+            consecutive_failures = 0
             self.last_frame = frame
             
             try:
@@ -173,11 +208,15 @@ class CameraBackend:
         if cmd_type == 'start':
             if not self.running:
                 self.running = True
-                threading.Thread(target=self.run, daemon=True).start()
-        
+                camera_index = command.get('camera_index')
+                threading.Thread(target=self.run, args=(camera_index,), daemon=True).start()
+
         elif cmd_type == 'stop':
             self.running = False
-        
+
+        elif cmd_type == 'list_cameras':
+            threading.Thread(target=self.list_cameras, daemon=True).start()
+
         elif cmd_type == 'upload_siat':
             data = command.get('data', {})
             self.send_json({
@@ -207,11 +246,14 @@ def read_stdin(backend):
 
 def main():
     backend = CameraBackend()
-    
+
     stdin_thread = threading.Thread(target=read_stdin, args=(backend,), daemon=True)
     stdin_thread.start()
-    
-    backend.run()
+
+    # La camara solo se enciende cuando llega el comando 'start' desde la UI
+    # (handle_command la lanza en su propio hilo). Este hilo se mantiene vivo
+    # escuchando stdin hasta que Electron cierre el proceso.
+    stdin_thread.join()
 
 if __name__ == '__main__':
     main()
