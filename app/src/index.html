@@ -81,19 +81,28 @@
           <!-- Numero de Factura -->
           <div class="field-row">
             <label class="field-label">No. FACTURA</label>
-            <input type="text" class="field-input" id="field-factura" value="---" readonly>
+            <div class="field-input-group">
+              <input type="text" class="field-input" id="field-factura" value="---" readonly>
+              <button class="btn-edit" id="btn-edit-factura">EDITAR</button>
+            </div>
           </div>
 
           <!-- Numero de Autorizacion -->
           <div class="field-row">
             <label class="field-label">No. AUTORIZACION</label>
-            <input type="text" class="field-input" id="field-autorizacion" value="---" readonly>
+            <div class="field-input-group">
+              <input type="text" class="field-input" id="field-autorizacion" value="---" readonly>
+              <button class="btn-edit" id="btn-edit-autorizacion">EDITAR</button>
+            </div>
           </div>
 
           <!-- Monto -->
           <div class="field-row">
             <label class="field-label">MONTO (BS.)</label>
-            <input type="text" class="field-input" id="field-monto" value="---" inputmode="decimal">
+            <div class="field-input-group">
+              <input type="text" class="field-input" id="field-monto" value="---" inputmode="decimal">
+              <button class="btn-edit" id="btn-edit-monto">EDITAR</button>
+            </div>
           </div>
 
           <!-- Estado -->
@@ -182,6 +191,23 @@
       <div class="modal-footer">
         <span class="modal-status" id="modal-status"></span>
         <button class="btn btn-primary" id="btn-modal-save">GUARDAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmar eliminacion -->
+  <div class="modal-overlay" id="modal-confirm" style="display:none">
+    <div class="modal-card modal-confirm-card">
+      <div class="modal-header">
+        <span class="modal-title">Eliminar factura</span>
+        <button class="modal-close" id="btn-confirm-close"></button>
+      </div>
+      <div class="modal-body modal-confirm-body">
+        <span id="modal-confirm-text">¿Eliminar esta factura?</span>
+      </div>
+      <div class="modal-footer modal-confirm-footer">
+        <button class="btn btn-cancel" id="btn-confirm-cancel">CANCELAR</button>
+        <button class="btn btn-danger" id="btn-confirm-ok">ELIMINAR</button>
       </div>
     </div>
   </div>

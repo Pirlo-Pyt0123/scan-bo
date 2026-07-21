@@ -163,8 +163,26 @@ ipcMain.handle('db:save-invoice', (event, fields) => {
   }
 });
 
+ipcMain.handle('db:update-invoice-fields', (event, { id, fields }) => {
+  try {
+    db.updateInvoiceFields(id, fields);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 ipcMain.handle('db:get-invoices', (event, empresa) => {
   return db.getInvoicesByEmpresa(empresa);
+});
+
+ipcMain.handle('db:delete-invoice', (event, id) => {
+  try {
+    db.deleteInvoice(id);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 });
 
 ipcMain.handle('db:get-empresa-nit', (event, empresa) => {
@@ -221,6 +239,11 @@ ipcMain.handle('siat:upload-batch', async (event, invoices) => {
           const msg = JSON.parse(line);
           if (msg.type === 'progress' && mainWindow) {
             mainWindow.webContents.send('siat:progress', msg);
+          } else if (msg.type === 'invoice_result') {
+            db.updateInvoiceStatus(msg.autorizacion, msg.factura, msg.status);
+            if (mainWindow) {
+              mainWindow.webContents.send('siat:invoice-result', msg);
+            }
           } else if (msg.type === 'success' && !resolved) {
             resolved = true;
             resolve({ success: true });

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "PYTHONPATH=\"../venv/lib/python3.14/site-packages\" electron-builder install-app-deps",
     "build:backend": "../venv/bin/pyinstaller --onefile --name backend --clean --distpath python/dist --workpath python/build --specpath python python/backend.py",
     "build:siat": "../venv/bin/pyinstaller --onefile --name siat_automation --clean --distpath python/dist --workpath python/build --specpath python --collect-all selenium --collect-all webdriver_manager python/siat_automation.py",
     "dist:linux": "pnpm run build:backend && pnpm run build:siat && electron-builder --linux AppImage"

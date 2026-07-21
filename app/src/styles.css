@@ -941,6 +941,64 @@ body {
   color: var(--success);
 }
 
+.history-item-status.status-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.history-item-status.status-invalid {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.history-item-status.status-duplicated {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.history-item-delete {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.history-item-delete::before,
+.history-item-delete::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 1.5px;
+  background: var(--text-muted);
+  top: 50%;
+  left: 50%;
+  border-radius: 1px;
+}
+
+.history-item-delete::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.history-item-delete::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.history-item-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.history-item-delete:hover::before,
+.history-item-delete:hover::after {
+  background: var(--danger);
+}
+
 /* SIAT Modal */
 .modal-overlay#modal-siat {
   position: fixed;
@@ -1049,4 +1107,63 @@ body {
 
 .modal-overlay#modal-siat .modal-status.error {
   color: #ef4444;
+}
+
+/* Confirm modal */
+.modal-confirm-card {
+  width: 360px;
+}
+
+.modal-confirm-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: var(--bg-clay);
+}
+
+.btn-danger {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  background: var(--danger);
+  color: white;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  filter: brightness(1.1);
 }

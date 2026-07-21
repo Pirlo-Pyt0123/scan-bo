@@ -20,6 +20,9 @@ const elements = {
   btnStart: document.getElementById('btn-start'),
   btnUpload: document.getElementById('btn-upload'),
   btnEditNit: document.getElementById('btn-edit-nit'),
+  btnEditFactura: document.getElementById('btn-edit-factura'),
+  btnEditAutorizacion: document.getElementById('btn-edit-autorizacion'),
+  btnEditMonto: document.getElementById('btn-edit-monto'),
   btnSelectCamera: document.getElementById('btn-select-camera'),
   cameraSelectLabel: document.getElementById('camera-select-label'),
   cameraModal: document.getElementById('camera-modal'),
@@ -34,7 +37,12 @@ const elements = {
   siatIdentity: document.getElementById('siat-identity'),
   siatEmail: document.getElementById('siat-email'),
   siatPassword: document.getElementById('siat-password'),
-  modalStatus: document.getElementById('modal-status')
+  modalStatus: document.getElementById('modal-status'),
+  modalConfirm: document.getElementById('modal-confirm'),
+  modalConfirmText: document.getElementById('modal-confirm-text'),
+  btnConfirmOk: document.getElementById('btn-confirm-ok'),
+  btnConfirmCancel: document.getElementById('btn-confirm-cancel'),
+  btnConfirmClose: document.getElementById('btn-confirm-close'),
 };
 
 const ctx = elements.videoCanvas.getContext('2d');
@@ -47,8 +55,12 @@ let state = {
   selectedEmpresa: 'entel',
   currentData: null,
   nitEditing: false,
+  facturaEditing: false,
+  autorizacionEditing: false,
+  montoEditing: false,
   hasFrame: false,
-  selectedCamera: savedCameraIndex !== null ? parseInt(savedCameraIndex) : null
+  selectedCamera: savedCameraIndex !== null ? parseInt(savedCameraIndex) : null,
+  pendingDeleteId: null
 };
 
 const EMPRESA_LABELS = { tigo: 'TIGO', entel: 'ENTEL', otro: 'sin clasificar' };
@@ -165,8 +177,12 @@ function renderHistory() {
     return;
   }
 
+  const STATUS_LABELS = { Pending: 'PEND', OK: 'OK', Invalid: 'ERR', Duplicated: 'DUP' };
+  const STATUS_CLASSES = { Pending: 'status-pending', OK: 'status-ok', Invalid: 'status-invalid', Duplicated: 'status-duplicated' };
+
   elements.historyList.innerHTML = state.records.map((item, index) => {
     const time = new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const st = item.status || 'Pending';
     return `
     <div class="history-item" data-index="${index}">
       <span class="history-item-num">${state.records.length - index}</span>
@@ -174,13 +190,15 @@ function renderHistory() {
       <span class="history-item-nit">Aut: ${item.autorizacion}</span>
       <span class="history-item-factura">Fact: ${item.factura}</span>
       <span class="history-item-monto">${item.monto !== '---' ? 'Bs. ' + item.monto : '---'}</span>
-      <span class="history-item-status">OK</span>
+      <span class="history-item-status ${STATUS_CLASSES[st] || ''}">${STATUS_LABELS[st] || st}</span>
+      <button class="history-item-delete" data-record-id="${item.id}" title="Eliminar factura"></button>
     </div>
   `;
   }).join('');
 
   document.querySelectorAll('.history-item').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('history-item-delete')) return;
       const index = parseInt(item.dataset.index);
       const entry = state.records[index];
       if (entry) {
@@ -191,6 +209,16 @@ function renderHistory() {
         state.currentData = { ...entry };
         elements.btnUpload.disabled = false;
       }
+    });
+  });
+
+  document.querySelectorAll('.history-item-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.pendingDeleteId = parseInt(btn.dataset.recordId);
+      const record = state.records.find(r => r.id === state.pendingDeleteId);
+      elements.modalConfirmText.textContent = `¿Eliminar factura ${record ? record.factura : ''}?`;
+      elements.modalConfirm.style.display = 'flex';
     });
   });
 }
@@ -279,7 +307,55 @@ function renderCameraOptions(cameras) {
   markSelectedCameraOption();
 }
 
-function toggleEditNit() {
+async function saveCurrentEdit() {
+  if (!state.currentData) return;
+  await ipcRenderer.invoke('db:update-invoice-fields', {
+    id: state.currentData.id,
+    fields: {
+      nit: state.currentData.nit,
+      monto: state.currentData.monto,
+      factura: state.currentData.factura,
+      autorizacion: state.currentData.autorizacion
+    }
+  });
+  for (let i = 0; i < state.records.length; i++) {
+    if (state.records[i].id === state.currentData.id) {
+      state.records[i] = { ...state.currentData };
+      break;
+    }
+  }
+  renderHistory();
+}
+
+function makeToggleEdit(inputEl, btnEl, stateKey, fieldKey) {
+  return async function() {
+    if (state[stateKey]) {
+      inputEl.readOnly = true;
+      inputEl.classList.remove('editing');
+      btnEl.textContent = 'EDITAR';
+      btnEl.classList.remove('active');
+      state[stateKey] = false;
+      if (state.currentData) {
+        state.currentData[fieldKey] = inputEl.value;
+        await saveCurrentEdit();
+      }
+    } else {
+      inputEl.readOnly = false;
+      inputEl.classList.add('editing');
+      inputEl.focus();
+      inputEl.select();
+      btnEl.textContent = 'GUARDAR';
+      btnEl.classList.add('active');
+      state[stateKey] = true;
+    }
+  };
+}
+
+const toggleEditFactura = makeToggleEdit(elements.fieldFactura, elements.btnEditFactura, 'facturaEditing', 'factura');
+const toggleEditAutorizacion = makeToggleEdit(elements.fieldAutorizacion, elements.btnEditAutorizacion, 'autorizacionEditing', 'autorizacion');
+const toggleEditMonto = makeToggleEdit(elements.fieldMonto, elements.btnEditMonto, 'montoEditing', 'monto');
+
+async function toggleEditNit() {
   if (state.nitEditing) {
     elements.fieldNit.readOnly = true;
     elements.fieldNit.classList.remove('editing');
@@ -289,6 +365,7 @@ function toggleEditNit() {
 
     if (state.currentData) {
       state.currentData.nit = elements.fieldNit.value;
+      await saveCurrentEdit();
     }
   } else {
     elements.fieldNit.readOnly = false;
@@ -383,6 +460,9 @@ document.getElementById('btn-close').addEventListener('click', () => {
 elements.btnStart.addEventListener('click', toggleScanning);
 elements.btnUpload.addEventListener('click', uploadToSIAT);
 elements.btnEditNit.addEventListener('click', toggleEditNit);
+elements.btnEditFactura.addEventListener('click', toggleEditFactura);
+elements.btnEditAutorizacion.addEventListener('click', toggleEditAutorizacion);
+elements.btnEditMonto.addEventListener('click', toggleEditMonto);
 elements.btnSelectCamera.addEventListener('click', openCameraPicker);
 elements.cameraModalClose.addEventListener('click', closeCameraPicker);
 elements.cameraModal.addEventListener('click', (e) => {
@@ -436,9 +516,50 @@ elements.btnTestData.addEventListener('click', injectTestData);
 elements.tabTigo.addEventListener('click', () => switchEmpresa('tigo'));
 elements.tabEntel.addEventListener('click', () => switchEmpresa('entel'));
 
+elements.btnConfirmOk.addEventListener('click', async () => {
+  if (state.pendingDeleteId === null) return;
+  await ipcRenderer.invoke('db:delete-invoice', state.pendingDeleteId);
+  state.records = state.records.filter(r => r.id !== state.pendingDeleteId);
+  if (state.currentData && state.currentData.id === state.pendingDeleteId) {
+    state.currentData = null;
+  }
+  state.pendingDeleteId = null;
+  elements.modalConfirm.style.display = 'none';
+  renderHistory();
+});
+
+function closeConfirmModal() {
+  state.pendingDeleteId = null;
+  elements.modalConfirm.style.display = 'none';
+}
+
+elements.btnConfirmCancel.addEventListener('click', closeConfirmModal);
+elements.btnConfirmClose.addEventListener('click', closeConfirmModal);
+elements.modalConfirm.addEventListener('click', (e) => {
+  if (e.target === elements.modalConfirm) closeConfirmModal();
+});
+
 elements.fieldNit.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && state.nitEditing) {
     toggleEditNit();
+  }
+});
+
+elements.fieldFactura.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && state.facturaEditing) {
+    toggleEditFactura();
+  }
+});
+
+elements.fieldAutorizacion.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && state.autorizacionEditing) {
+    toggleEditAutorizacion();
+  }
+});
+
+elements.fieldMonto.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && state.montoEditing) {
+    toggleEditMonto();
   }
 });
 
@@ -447,6 +568,21 @@ ipcRenderer.on('siat:progress', (event, progress) => {
   setFieldStatus(progress.message || 'Procesando...', '');
   if (progress.current && progress.total) {
     elements.btnUpload.textContent = `SUBIENDO ${progress.current}/${progress.total}`;
+  }
+});
+
+ipcRenderer.on('siat:invoice-result', (event, result) => {
+  const record = state.records.find(r => r.autorizacion === result.autorizacion && r.factura === result.factura);
+  if (record) {
+    record.status = result.status;
+    renderHistory();
+  }
+  if (result.status === 'OK') {
+    setFieldStatus(`Factura ${result.factura} subida correctamente`, 'uploaded');
+  } else if (result.status === 'Duplicated') {
+    setFieldStatus(`Factura ${result.factura} ya estaba registrada en SIAT`, 'uploaded');
+  } else {
+    setFieldStatus(`Error en factura ${result.factura}: ${result.message || 'Invalida'}`, '');
   }
 });
 

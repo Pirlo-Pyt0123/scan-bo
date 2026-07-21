@@ -27,9 +27,14 @@ function getDb() {
       monto TEXT,
       empresa TEXT NOT NULL,
       created_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Pending',
       UNIQUE(autorizacion, factura)
     )
   `);
+
+  try {
+    db.exec(`ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'Pending'`);
+  } catch (e) {}
 
   return db;
 }
@@ -43,12 +48,13 @@ function classifyEmpresa(nit) {
 function saveInvoice(fields) {
   const empresa = classifyEmpresa(fields.nit);
   const stmt = getDb().prepare(`
-    INSERT INTO invoices (autorizacion, factura, nit, monto, empresa, created_at)
-    VALUES (@autorizacion, @factura, @nit, @monto, @empresa, @created_at)
+    INSERT INTO invoices (autorizacion, factura, nit, monto, empresa, created_at, status)
+    VALUES (@autorizacion, @factura, @nit, @monto, @empresa, @created_at, 'Pending')
     ON CONFLICT(autorizacion, factura) DO UPDATE SET
       nit = excluded.nit,
       monto = excluded.monto,
-      empresa = excluded.empresa
+      empresa = excluded.empresa,
+      status = 'Pending'
   `);
   stmt.run({
     autorizacion: fields.autorizacion,
@@ -61,10 +67,31 @@ function saveInvoice(fields) {
   return empresa;
 }
 
+function updateInvoiceFields(id, fields) {
+  const empresa = classifyEmpresa(fields.nit || '');
+  getDb().prepare(`
+    UPDATE invoices SET nit = ?, monto = ?, factura = ?, autorizacion = ?, empresa = ? WHERE id = ?
+  `).run(
+    fields.nit || null, fields.monto || null,
+    fields.factura || null, fields.autorizacion || null,
+    empresa, id
+  );
+}
+
+function deleteInvoice(id) {
+  getDb().prepare('DELETE FROM invoices WHERE id = ?').run(id);
+}
+
+function updateInvoiceStatus(autorizacion, factura, status) {
+  getDb().prepare(`
+    UPDATE invoices SET status = ? WHERE autorizacion = ? AND factura = ?
+  `).run(status, autorizacion, factura);
+}
+
 function getInvoicesByEmpresa(empresa) {
   return getDb()
     .prepare('SELECT * FROM invoices WHERE empresa = ? ORDER BY created_at DESC')
     .all(empresa);
 }
 
-module.exports = { saveInvoice, getInvoicesByEmpresa, classifyEmpresa, EMPRESA_NIT };
+module.exports = { saveInvoice, updateInvoiceStatus, getInvoicesByEmpresa, classifyEmpresa, EMPRESA_NIT };

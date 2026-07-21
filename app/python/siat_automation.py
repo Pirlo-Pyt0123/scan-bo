@@ -4,11 +4,12 @@ import json
 import time
 import os
 import shutil
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.firefox import GeckoDriverManager
@@ -35,6 +36,45 @@ def retry_click(wait_obj, by, selector, attempts=3, delay=2):
             if attempt < attempts - 1:
                 time.sleep(delay)
     return False
+
+def fill_field(driver, field_id, value):
+    try:
+        el = driver.find_element(By.ID, field_id)
+        el.clear()
+        el.send_keys(str(value))
+        return True
+    except:
+        return False
+
+def click_adicionar(driver, long):
+    btn = long.until(
+        EC.element_to_be_clickable((By.ID, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:btnVerificarCompra'))
+    )
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
+    time.sleep(0.3)
+    driver.execute_script("arguments[0].click();", btn)
+
+def read_toast(driver, timeout=8):
+    try:
+        toast = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '.toast'))
+        )
+        title_el = toast.find_element(By.CSS_SELECTOR, '.toast-title')
+        msg_el = toast.find_element(By.CSS_SELECTOR, '.toast-message')
+        title = title_el.text.strip()
+        message = msg_el.text.strip()
+        return title, message
+    except:
+        return None, None
+
+def close_dialog_if_open(driver):
+    try:
+        cerrar = driver.find_element(By.ID, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:cerrar2')
+        if cerrar.is_displayed():
+            driver.execute_script("arguments[0].click();", cerrar)
+            time.sleep(1)
+    except:
+        pass
 
 def main():
 
@@ -69,7 +109,7 @@ def main():
         driver.set_window_size(1920, 1080)
         long = WebDriverWait(driver, 25)
 
-        send_json({'type': 'progress', 'step': 'login', 'message': 'Iniciando sesión en SIAT...', 'current': 0, 'total': len(invoices)})
+        send_json({'type': 'progress', 'step': 'login', 'message': 'Iniciando sesion en SIAT...', 'current': 0, 'total': len(invoices)})
 
         driver.get('https://siat.impuestos.gob.bo/')
 
@@ -79,16 +119,12 @@ def main():
         driver.find_element(By.ID, 'password').send_keys(credentials.get('password', ''))
         driver.find_element(By.ID, 'kc-login').click()
 
-        # Si el login funciona, el SIAT navega fuera de la pantalla de login y
-        # el boton 'kc-login' deja de estar presente/visible. Si las
-        # credenciales son incorrectas, Keycloak vuelve a mostrar el mismo
-        # formulario con un error, asi que el boton sigue ahi.
         try:
             WebDriverWait(driver, 8).until(
                 EC.invisibility_of_element_located((By.ID, 'kc-login'))
             )
         except TimeoutException:
-            send_json({'type': 'error', 'message': 'No se pudo iniciar sesion en el SIAT. Verifica tu NIT/CI, correo y contraseña.'})
+            send_json({'type': 'error', 'message': 'No se pudo iniciar sesion en el SIAT. Verifica tu NIT/CI, correo y contrasena.'})
             return
 
         send_json({'type': 'progress', 'step': 'navigate', 'message': 'Buscando Aplicaciones...', 'current': 0, 'total': len(invoices)})
@@ -97,16 +133,16 @@ def main():
         if not ok:
             ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Aplicaciones')]", attempts=2, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró el botón Aplicaciones'})
+            send_json({'type': 'error', 'message': 'No se encontro el boton Aplicaciones'})
             return
 
         time.sleep(1.5)
 
-        send_json({'type': 'progress', 'step': 'navigate', 'message': 'Abriendo Sistema de Facturación...', 'current': 0, 'total': len(invoices)})
+        send_json({'type': 'progress', 'step': 'navigate', 'message': 'Abriendo Sistema de Facturacion...', 'current': 0, 'total': len(invoices)})
 
         ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Sistema de Facturación') or contains(text(), 'Sistema de Facturacion')]", attempts=3, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró Sistema de Facturación'})
+            send_json({'type': 'error', 'message': 'No se encontro Sistema de Facturacion'})
             return
 
         time.sleep(1)
@@ -115,7 +151,7 @@ def main():
 
         ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Registro de Compras y Ventas')]", attempts=3, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró Registro de Compras y Ventas'})
+            send_json({'type': 'error', 'message': 'No se encontro Registro de Compras y Ventas'})
             return
 
         try:
@@ -124,11 +160,11 @@ def main():
             pass
         time.sleep(2)
 
-        send_json({'type': 'progress', 'step': 'navigate', 'message': 'Abriendo COMPRAS en el menú lateral...', 'current': 0, 'total': len(invoices)})
+        send_json({'type': 'progress', 'step': 'navigate', 'message': 'Abriendo COMPRAS en el menu lateral...', 'current': 0, 'total': len(invoices)})
 
         ok = retry_click(long, By.XPATH, "//aside[contains(@class,'sidebar')]//span[text()='COMPRAS']/ancestor::a", attempts=3, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró menú COMPRAS en sidebar'})
+            send_json({'type': 'error', 'message': 'No se encontro menu COMPRAS en sidebar'})
             return
 
         time.sleep(1)
@@ -139,7 +175,7 @@ def main():
         if not ok:
             ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Registro de Compras')]", attempts=2, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró Registro de Compras'})
+            send_json({'type': 'error', 'message': 'No se encontro Registro de Compras'})
             return
 
         time.sleep(2)
@@ -150,60 +186,94 @@ def main():
         if not ok:
             ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Buscar')]", attempts=2, delay=2)
         if not ok:
-            send_json({'type': 'error', 'message': 'No se encontró botón Buscar'})
+            send_json({'type': 'error', 'message': 'No se encontro boton Buscar'})
             return
 
         time.sleep(1)
 
-        retry_click(long, By.XPATH, "//*[contains(text(), 'Nuevo Registro') or contains(text(), 'Nuevo')]", attempts=3, delay=2)
-        time.sleep(1)
-
         send_json({'type': 'progress', 'step': 'navigate', 'message': f'Listo para {len(invoices)} facturas', 'current': 0, 'total': len(invoices)})
+
+        today_day = datetime.now().strftime('%d')
 
         for i, inv in enumerate(invoices):
             send_json({
                 'type': 'progress',
-                'step': 'filling',
-                'message': f'Factura {i+1}/{len(invoices)}: {inv.get("factura", "")}',
+                'step': 'navigate',
+                'message': f'Abrir nuevo registro {i+1}/{len(invoices)}: {inv.get("factura", "")}',
                 'current': i + 1,
                 'total': len(invoices)
             })
 
-            fields = {
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNitProveedor': inv.get('nit', ''),
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtCodAutorizacion': inv.get('autorizacion', ''),
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNroFactura': inv.get('factura', ''),
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNroDui': '0',
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtFechaFactura': time.strftime('%d'),
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoTotal_input': inv.get('monto', '0'),
-                'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtCodControl': '0-0-0',
-            }
+            ok = retry_click(long, By.XPATH, "//*[contains(text(), 'Nuevo Registro') or contains(text(), 'Nuevo')]", attempts=3, delay=2)
+            if not ok:
+                send_json({'type': 'error', 'message': f'No se pudo abrir Nuevo Registro para factura {i+1}'})
+                return
+            time.sleep(1.5)
 
-            for field_id, value in fields.items():
-                try:
-                    el = driver.find_element(By.ID, field_id)
-                    el.clear()
-                    el.send_keys(str(value))
-                except:
-                    pass
+            factura_web = inv.get('factura', '').lstrip('0') or '0'
+
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNitProveedor', inv.get('nit', ''))
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtCodAutorizacion', inv.get('autorizacion', ''))
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNroFactura', factura_web)
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtNroDui', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtFechaFactura', today_day)
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoTotal_input', inv.get('monto', '0'))
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoIce_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoIehd_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoIpj_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoTasas_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoOtrosNS_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoExentas_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtMontoTasaCero_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtDescuentos_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtGiftCard_input', '0')
+            fill_field(driver, 'formPrincipal:tabRegistroCompras:cmpComprasDT:cfacturaNueva:txtCodControl', '0-0-0')
 
             send_json({
                 'type': 'progress',
-                'step': 'waiting',
-                'message': f'Esperando 3s...',
+                'step': 'submitting',
+                'message': f'Enviando factura {i+1}/{len(invoices)}...',
                 'current': i + 1,
                 'total': len(invoices)
             })
 
-            time.sleep(3)
-
-            for field_id in fields:
-                try:
-                    driver.find_element(By.ID, field_id).clear()
-                except:
-                    pass
-
             time.sleep(0.5)
+
+            try:
+                click_adicionar(driver, long)
+            except Exception as e:
+                send_json({
+                    'type': 'invoice_result',
+                    'factura': inv.get('factura', ''),
+                    'autorizacion': inv.get('autorizacion', ''),
+                    'status': 'Invalid',
+                    'message': f'Error al hacer clic en Adicionar: {str(e)}'
+                })
+                close_dialog_if_open(driver)
+                continue
+
+            toast_title, toast_message = read_toast(driver, timeout=10)
+
+            if toast_title and 'exitoso' in toast_title.lower():
+                send_json({
+                    'type': 'invoice_result',
+                    'factura': inv.get('factura', ''),
+                    'autorizacion': inv.get('autorizacion', ''),
+                    'status': 'OK',
+                    'message': toast_message or ''
+                })
+            else:
+                error_msg = toast_message or toast_title or 'Error desconocido'
+                status = 'Duplicated' if toast_message and 'ya se encuentra registrada' in toast_message.lower() else 'Invalid'
+                send_json({
+                    'type': 'invoice_result',
+                    'factura': inv.get('factura', ''),
+                    'autorizacion': inv.get('autorizacion', ''),
+                    'status': status,
+                    'message': error_msg
+                })
+
+            close_dialog_if_open(driver)
 
         send_json({
             'type': 'progress',
