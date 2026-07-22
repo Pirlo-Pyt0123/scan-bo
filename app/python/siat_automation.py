@@ -132,7 +132,10 @@ def main():
 
         service = Service(GeckoDriverManager().install())
         driver = webdriver.Firefox(service=service, options=options)
-        driver.set_window_size(1920, 1080)
+        # 1280x800 alcanza de sobra para el sitio del SIAT y no tapa toda la
+        # pantalla como pasaba con 1920x1080 (se notaba mas en Windows).
+        driver.set_window_size(1280, 800)
+        driver.set_window_position(80, 60)
         long = WebDriverWait(driver, 25)
 
         send_json({'type': 'progress', 'step': 'login', 'message': 'Iniciando sesion en SIAT...', 'current': 0, 'total': len(invoices)})

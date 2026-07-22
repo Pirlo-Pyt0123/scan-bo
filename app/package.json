@@ -35,17 +35,32 @@
       "icon": "assets/icon.png",
       "category": "Office",
       "extraResources": [
-        { "from": "python/dist/backend", "to": "backend/backend" },
-        { "from": "python/dist/siat_automation", "to": "backend/siat_automation" }
+        {
+          "from": "python/dist/backend",
+          "to": "backend/backend"
+        },
+        {
+          "from": "python/dist/siat_automation",
+          "to": "backend/siat_automation"
+        }
       ]
     },
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico",
       "extraResources": [
-        { "from": "python/dist/backend.exe", "to": "backend/backend.exe" },
-        { "from": "python/dist/siat_automation.exe", "to": "backend/siat_automation.exe" }
+        {
+          "from": "python/dist/backend.exe",
+          "to": "backend/backend.exe"
+        },
+        {
+          "from": "python/dist/siat_automation.exe",
+          "to": "backend/siat_automation.exe"
+        }
       ]
     }
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
   }
 }

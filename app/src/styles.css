@@ -624,6 +624,60 @@ body {
   gap: 8px;
 }
 
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.field-label-compact {
+  font-size: 10px;
+}
+
+.monto-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.monto-preset {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.monto-preset:hover {
+  border-color: var(--accent-light);
+  color: var(--accent);
+}
+
+.monto-preset.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.monto-preset.shake {
+  animation: shake-btn 0.4s;
+  border-color: var(--danger);
+}
+
+@keyframes shake-btn {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
 .field-input {
   flex: 1;
   padding: 12px 16px;
@@ -803,6 +857,29 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
+}
+
+.btn-export {
+  margin-left: 10px;
+  padding: 6px 12px;
+  background: var(--success);
+  border: none;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-export:hover {
+  filter: brightness(1.08);
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .company-tab {

@@ -98,11 +98,16 @@
 
           <!-- Monto -->
           <div class="field-row">
-            <label class="field-label">MONTO (BS.)</label>
-            <div class="field-input-group">
-              <input type="text" class="field-input" id="field-monto" value="---" inputmode="decimal">
-              <button class="btn-edit" id="btn-edit-monto">EDITAR</button>
+            <div class="field-label-row">
+              <label class="field-label field-label-compact">MONTO</label>
+              <div class="monto-presets">
+                <button class="monto-preset" data-amount="10">10</button>
+                <button class="monto-preset" data-amount="15">15</button>
+                <button class="monto-preset" data-amount="30">30</button>
+                <button class="monto-preset" data-amount="50">50</button>
+              </div>
             </div>
+            <input type="text" class="field-input" id="field-monto" value="---" readonly inputmode="decimal">
           </div>
 
           <!-- Estado -->
@@ -131,6 +136,7 @@
             <button class="status-tab" id="tab-status-registered" data-status="registered">REGISTRADAS</button>
           </div>
           <span class="history-count" id="history-count">0</span>
+          <button class="btn-export" id="btn-export-excel" title="Exportar registradas a Excel">EXPORTAR</button>
         </div>
         <div class="history-list" id="history-list">
           <div class="history-empty">Sin registros</div>

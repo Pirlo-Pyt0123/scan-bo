@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const ExcelJS = require('exceljs');
 const siat = require('../siat');
 const db = require('../db');
 
@@ -187,6 +188,54 @@ ipcMain.handle('db:delete-invoice', (event, id) => {
 
 ipcMain.handle('db:get-empresa-nit', (event, empresa) => {
   return db.EMPRESA_NIT[empresa] || null;
+});
+
+const STATUS_LABELS_XLSX = { OK: 'Registrada', Duplicated: 'Duplicada', Invalid: 'Invalida', Pending: 'Pendiente' };
+
+ipcMain.handle('export:excel', async (event, empresa) => {
+  const records = db.getInvoicesByEmpresa(empresa, 'registered');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exportar facturas registradas',
+    defaultPath: `facturas_${empresa}_registradas_${today}.xlsx`,
+    filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+  });
+
+  if (canceled || !filePath) {
+    return { success: false, canceled: true };
+  }
+
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Registradas');
+
+    sheet.columns = [
+      { header: 'Autorizacion', key: 'autorizacion', width: 22 },
+      { header: 'Factura', key: 'factura', width: 16 },
+      { header: 'NIT', key: 'nit', width: 16 },
+      { header: 'Monto (Bs.)', key: 'monto', width: 14 },
+      { header: 'Estado', key: 'status', width: 14 },
+      { header: 'Fecha', key: 'created_at', width: 20 }
+    ];
+    sheet.getRow(1).font = { bold: true };
+
+    for (const r of records) {
+      sheet.addRow({
+        autorizacion: r.autorizacion,
+        factura: r.factura,
+        nit: r.nit,
+        monto: r.monto,
+        status: STATUS_LABELS_XLSX[r.status] || r.status,
+        created_at: new Date(r.created_at).toLocaleString('es-BO')
+      });
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+    return { success: true, path: filePath, count: records.length };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 });
 
 app.whenReady().then(() => {

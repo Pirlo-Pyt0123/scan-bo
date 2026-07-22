@@ -17,12 +17,12 @@ const elements = {
   tabEntel: document.getElementById('tab-entel'),
   tabStatusPending: document.getElementById('tab-status-pending'),
   tabStatusRegistered: document.getElementById('tab-status-registered'),
+  btnExportExcel: document.getElementById('btn-export-excel'),
   btnStart: document.getElementById('btn-start'),
   btnUpload: document.getElementById('btn-upload'),
   btnEditNit: document.getElementById('btn-edit-nit'),
   btnEditFactura: document.getElementById('btn-edit-factura'),
   btnEditAutorizacion: document.getElementById('btn-edit-autorizacion'),
-  btnEditMonto: document.getElementById('btn-edit-monto'),
   btnSelectCamera: document.getElementById('btn-select-camera'),
   cameraSelectLabel: document.getElementById('camera-select-label'),
   cameraModal: document.getElementById('camera-modal'),
@@ -58,7 +58,6 @@ let state = {
   nitEditing: false,
   facturaEditing: false,
   autorizacionEditing: false,
-  montoEditing: false,
   hasFrame: false,
   selectedCamera: savedCameraIndex !== null ? parseInt(savedCameraIndex) : null,
   pendingDeleteId: null
@@ -214,6 +213,7 @@ function renderHistory() {
         elements.fieldFactura.value = entry.factura;
         elements.fieldNit.value = entry.nit;
         elements.fieldMonto.value = entry.monto;
+        syncMontoPresetHighlight(entry.monto);
         state.currentData = { ...entry };
         elements.btnUpload.disabled = false;
       }
@@ -242,6 +242,16 @@ function toggleScanning() {
     elements.cameraPlaceholder.classList.remove('hidden');
     elements.btnSelectCamera.disabled = false;
   } else {
+    if (elements.fieldMonto.value === '---' || elements.fieldMonto.value === '') {
+      setFieldStatus('Selecciona un monto antes de escanear', '');
+      document.querySelectorAll('.monto-preset').forEach((btn) => {
+        btn.classList.remove('shake');
+        void btn.offsetWidth;
+        btn.classList.add('shake');
+      });
+      return;
+    }
+
     ipcRenderer.send('send-command', {
       type: 'start',
       camera_index: state.selectedCamera
@@ -361,7 +371,23 @@ function makeToggleEdit(inputEl, btnEl, stateKey, fieldKey) {
 
 const toggleEditFactura = makeToggleEdit(elements.fieldFactura, elements.btnEditFactura, 'facturaEditing', 'factura');
 const toggleEditAutorizacion = makeToggleEdit(elements.fieldAutorizacion, elements.btnEditAutorizacion, 'autorizacionEditing', 'autorizacion');
-const toggleEditMonto = makeToggleEdit(elements.fieldMonto, elements.btnEditMonto, 'montoEditing', 'monto');
+
+function syncMontoPresetHighlight(value) {
+  document.querySelectorAll('.monto-preset').forEach((btn) => {
+    btn.classList.toggle('selected', btn.dataset.amount === String(value));
+  });
+}
+
+async function selectMontoPreset(amount) {
+  elements.fieldMonto.value = String(amount);
+  flashField(elements.fieldMonto);
+  syncMontoPresetHighlight(amount);
+
+  if (state.currentData) {
+    state.currentData.monto = String(amount);
+    await saveCurrentEdit();
+  }
+}
 
 async function toggleEditNit() {
   if (state.nitEditing) {
@@ -446,6 +472,7 @@ async function injectTestData() {
     elements.fieldFactura.value = last.factura;
     elements.fieldNit.value = last.nit;
     elements.fieldMonto.value = last.monto;
+    syncMontoPresetHighlight(last.monto);
     state.currentData = { ...last };
     elements.btnUpload.disabled = false;
     setFieldStatus('Datos de prueba cargados', 'scanned');
@@ -470,7 +497,9 @@ elements.btnUpload.addEventListener('click', uploadToSIAT);
 elements.btnEditNit.addEventListener('click', toggleEditNit);
 elements.btnEditFactura.addEventListener('click', toggleEditFactura);
 elements.btnEditAutorizacion.addEventListener('click', toggleEditAutorizacion);
-elements.btnEditMonto.addEventListener('click', toggleEditMonto);
+document.querySelectorAll('.monto-preset').forEach((btn) => {
+  btn.addEventListener('click', () => selectMontoPreset(btn.dataset.amount));
+});
 elements.btnSelectCamera.addEventListener('click', openCameraPicker);
 elements.cameraModalClose.addEventListener('click', closeCameraPicker);
 elements.cameraModal.addEventListener('click', (e) => {
@@ -525,6 +554,24 @@ elements.tabEntel.addEventListener('click', () => switchEmpresa('entel'));
 elements.tabStatusPending.addEventListener('click', () => switchStatusGroup('pending'));
 elements.tabStatusRegistered.addEventListener('click', () => switchStatusGroup('registered'));
 
+elements.btnExportExcel.addEventListener('click', async () => {
+  elements.btnExportExcel.disabled = true;
+  elements.btnExportExcel.textContent = 'EXPORTANDO...';
+
+  const result = await ipcRenderer.invoke('export:excel', state.selectedEmpresa);
+
+  elements.btnExportExcel.disabled = false;
+  elements.btnExportExcel.textContent = 'EXPORTAR';
+
+  if (result.canceled) return;
+
+  if (result.success) {
+    setFieldStatus(`Excel exportado: ${result.count} factura(s)`, 'uploaded');
+  } else {
+    setFieldStatus('Error al exportar: ' + (result.error || 'desconocido'), '');
+  }
+});
+
 elements.btnConfirmOk.addEventListener('click', async () => {
   if (state.pendingDeleteId === null) return;
   await ipcRenderer.invoke('db:delete-invoice', state.pendingDeleteId);
@@ -563,12 +610,6 @@ elements.fieldFactura.addEventListener('keydown', (e) => {
 elements.fieldAutorizacion.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && state.autorizacionEditing) {
     toggleEditAutorizacion();
-  }
-});
-
-elements.fieldMonto.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && state.montoEditing) {
-    toggleEditMonto();
   }
 });
 
