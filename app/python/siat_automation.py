@@ -14,7 +14,33 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.firefox import GeckoDriverManager
 
-os.environ['QT_QPA_PLATFORM'] = 'xcb'
+if sys.platform.startswith('linux'):
+    os.environ.setdefault('QT_QPA_PLATFORM', 'xcb')
+
+def find_firefox():
+    found = shutil.which('firefox') or shutil.which('firefox-esr')
+    if found:
+        return found
+
+    if sys.platform == 'win32':
+        # El instalador de Firefox en Windows no lo agrega al PATH, asi que
+        # shutil.which no lo encuentra aunque este instalado. Probamos las
+        # ubicaciones tipicas.
+        candidates = []
+        for env_var in ('PROGRAMFILES', 'PROGRAMFILES(X86)', 'LOCALAPPDATA'):
+            base = os.environ.get(env_var)
+            if base:
+                candidates.append(os.path.join(base, 'Mozilla Firefox', 'firefox.exe'))
+        for path in candidates:
+            if os.path.isfile(path):
+                return path
+
+    elif sys.platform == 'darwin':
+        mac_path = '/Applications/Firefox.app/Contents/MacOS/firefox'
+        if os.path.isfile(mac_path):
+            return mac_path
+
+    return None
 
 def send_json(data):
     try:
@@ -95,7 +121,7 @@ def main():
     try:
         send_json({'type': 'progress', 'step': 'login', 'message': 'Iniciando Firefox...', 'current': 0, 'total': len(invoices)})
 
-        firefox_path = shutil.which('firefox') or shutil.which('firefox-esr')
+        firefox_path = find_firefox()
         if not firefox_path:
             send_json({'type': 'error', 'message': 'No se encontro Firefox instalado en este equipo. Es necesario para subir facturas al SIAT.'})
             return
