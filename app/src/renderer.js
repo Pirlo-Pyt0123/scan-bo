@@ -14,9 +14,9 @@ const elements = {
   fieldStatusText: document.getElementById('field-status-text'),
   historyList: document.getElementById('history-list'),
   historyCount: document.getElementById('history-count'),
-  tabTigo: document.getElementById('tab-tigo'),
   tabEntel: document.getElementById('tab-entel'),
-  historyEmpresaTitle: document.getElementById('history-empresa-title'),
+  tabStatusPending: document.getElementById('tab-status-pending'),
+  tabStatusRegistered: document.getElementById('tab-status-registered'),
   btnStart: document.getElementById('btn-start'),
   btnUpload: document.getElementById('btn-upload'),
   btnEditNit: document.getElementById('btn-edit-nit'),
@@ -53,6 +53,7 @@ let state = {
   isRunning: false,
   records: [],
   selectedEmpresa: 'entel',
+  statusGroup: 'pending',
   currentData: null,
   nitEditing: false,
   facturaEditing: false,
@@ -63,7 +64,7 @@ let state = {
   pendingDeleteId: null
 };
 
-const EMPRESA_LABELS = { tigo: 'TIGO', entel: 'ENTEL', otro: 'sin clasificar' };
+const EMPRESA_LABELS = { entel: 'ENTEL', otro: 'sin clasificar' };
 
 updateCameraLabel();
 
@@ -150,15 +151,22 @@ async function saveCurrentRecord() {
 }
 
 async function loadRecords(empresa) {
-  state.records = await ipcRenderer.invoke('db:get-invoices', empresa);
+  state.records = await ipcRenderer.invoke('db:get-invoices', empresa, state.statusGroup);
   renderHistory();
+}
+
+function switchStatusGroup(statusGroup) {
+  state.statusGroup = statusGroup;
+  elements.tabStatusPending.classList.toggle('selected', statusGroup === 'pending');
+  elements.tabStatusRegistered.classList.toggle('selected', statusGroup === 'registered');
+  // Ya estan registradas en SIAT, no tiene sentido volver a subirlas desde aca.
+  elements.btnUpload.disabled = statusGroup === 'registered';
+  loadRecords(state.selectedEmpresa);
 }
 
 async function switchEmpresa(empresa) {
   state.selectedEmpresa = empresa;
-  elements.tabTigo.classList.toggle('selected', empresa === 'tigo');
   elements.tabEntel.classList.toggle('selected', empresa === 'entel');
-  elements.historyEmpresaTitle.textContent = EMPRESA_LABELS[empresa];
 
   const nit = await ipcRenderer.invoke('db:get-empresa-nit', empresa);
   if (nit) {
@@ -513,8 +521,9 @@ elements.btnModalSave.addEventListener('click', async () => {
 });
 
 elements.btnTestData.addEventListener('click', injectTestData);
-elements.tabTigo.addEventListener('click', () => switchEmpresa('tigo'));
 elements.tabEntel.addEventListener('click', () => switchEmpresa('entel'));
+elements.tabStatusPending.addEventListener('click', () => switchStatusGroup('pending'));
+elements.tabStatusRegistered.addEventListener('click', () => switchStatusGroup('registered'));
 
 elements.btnConfirmOk.addEventListener('click', async () => {
   if (state.pendingDeleteId === null) return;
@@ -572,10 +581,12 @@ ipcRenderer.on('siat:progress', (event, progress) => {
 });
 
 ipcRenderer.on('siat:invoice-result', (event, result) => {
-  const record = state.records.find(r => r.autorizacion === result.autorizacion && r.factura === result.factura);
-  if (record) {
-    record.status = result.status;
-    renderHistory();
+  const wasInView = state.records.some(r => r.autorizacion === result.autorizacion && r.factura === result.factura);
+  if (wasInView) {
+    // El estado cambio (Pending -> OK/Duplicated/Invalid): recargamos para
+    // que la factura "se mueva" de Pendientes a Registradas (o viceversa)
+    // en vez de solo pintar el badge sobre la lista vieja.
+    loadRecords(state.selectedEmpresa);
   }
   if (result.status === 'OK') {
     setFieldStatus(`Factura ${result.factura} subida correctamente`, 'uploaded');

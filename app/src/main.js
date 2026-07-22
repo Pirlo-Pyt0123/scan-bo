@@ -172,8 +172,8 @@ ipcMain.handle('db:update-invoice-fields', (event, { id, fields }) => {
   }
 });
 
-ipcMain.handle('db:get-invoices', (event, empresa) => {
-  return db.getInvoicesByEmpresa(empresa);
+ipcMain.handle('db:get-invoices', (event, empresa, statusGroup) => {
+  return db.getInvoicesByEmpresa(empresa, statusGroup);
 });
 
 ipcMain.handle('db:delete-invoice', (event, id) => {

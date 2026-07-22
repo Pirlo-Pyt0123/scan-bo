@@ -5,8 +5,7 @@ const { app } = require('electron');
 // NITs fijos de cada empresa: sirven para clasificar automaticamente cada
 // factura/tarjeta escaneada segun el NIT que tenga cargado en ese momento.
 const EMPRESA_NIT = {
-  entel: '1020703023',
-  tigo: '1020255020'
+  entel: '1020703023'
 };
 
 let db = null;
@@ -41,7 +40,6 @@ function getDb() {
 
 function classifyEmpresa(nit) {
   if (nit === EMPRESA_NIT.entel) return 'entel';
-  if (nit === EMPRESA_NIT.tigo) return 'tigo';
   return 'otro';
 }
 
@@ -88,10 +86,17 @@ function updateInvoiceStatus(autorizacion, factura, status) {
   `).run(status, autorizacion, factura);
 }
 
-function getInvoicesByEmpresa(empresa) {
+const STATUS_GROUPS = {
+  pending: ['Pending', 'Invalid'],
+  registered: ['OK', 'Duplicated']
+};
+
+function getInvoicesByEmpresa(empresa, statusGroup = 'pending') {
+  const statuses = STATUS_GROUPS[statusGroup] || STATUS_GROUPS.pending;
+  const placeholders = statuses.map(() => '?').join(',');
   return getDb()
-    .prepare('SELECT * FROM invoices WHERE empresa = ? ORDER BY created_at DESC')
-    .all(empresa);
+    .prepare(`SELECT * FROM invoices WHERE empresa = ? AND status IN (${placeholders}) ORDER BY created_at DESC`)
+    .all(empresa, ...statuses);
 }
 
 module.exports = { saveInvoice, updateInvoiceStatus, getInvoicesByEmpresa, classifyEmpresa, EMPRESA_NIT };

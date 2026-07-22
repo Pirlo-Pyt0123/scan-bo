@@ -117,15 +117,6 @@
     <!-- Bottom - Company records -->
     <div class="history-section">
       <div class="company-tabs">
-        <!-- TIGO oculto temporalmente: su QR trae otros campos distintos a
-             los que parsea backend.py, hay que ajustar el parseo antes de
-             volver a mostrarlo -->
-        <button class="company-tab" id="tab-tigo" data-empresa="tigo" style="display:none">
-          <span class="company-tab-name">TIGO</span>
-          <span class="company-tab-logo">
-            <img src="../assets/logo-tigo.png" alt="Tigo">
-          </span>
-        </button>
         <button class="company-tab selected" id="tab-entel" data-empresa="entel">
           <span class="company-tab-name">ENTEL</span>
           <span class="company-tab-logo">
@@ -135,7 +126,10 @@
       </div>
       <div class="history-content">
         <div class="history-content-header">
-          <span class="history-content-title" id="history-empresa-title">ENTEL</span>
+          <div class="status-tabs">
+            <button class="status-tab selected" id="tab-status-pending" data-status="pending">PENDIENTES</button>
+            <button class="status-tab" id="tab-status-registered" data-status="registered">REGISTRADAS</button>
+          </div>
           <span class="history-count" id="history-count">0</span>
         </div>
         <div class="history-list" id="history-list">

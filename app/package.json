@@ -6,10 +6,11 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "postinstall": "PYTHONPATH=\"../venv/lib/python3.14/site-packages\" electron-builder install-app-deps",
-    "build:backend": "../venv/bin/pyinstaller --onefile --name backend --clean --distpath python/dist --workpath python/build --specpath python python/backend.py",
-    "build:siat": "../venv/bin/pyinstaller --onefile --name siat_automation --clean --distpath python/dist --workpath python/build --specpath python --collect-all selenium --collect-all webdriver_manager python/siat_automation.py",
-    "dist:linux": "pnpm run build:backend && pnpm run build:siat && electron-builder --linux AppImage"
+    "postinstall": "node scripts/postinstall.js",
+    "build:backend": "node scripts/build-python.js backend",
+    "build:siat": "node scripts/build-python.js siat",
+    "dist:linux": "pnpm run build:backend && pnpm run build:siat && electron-builder --linux AppImage",
+    "dist:win": "pnpm run build:backend && pnpm run build:siat && electron-builder --win"
   },
   "author": "",
   "license": "MIT",
@@ -30,24 +31,22 @@
       "assets/*.png",
       "!python/**"
     ],
-    "extraResources": [
-      {
-        "from": "python/dist/backend",
-        "to": "backend/backend"
-      },
-      {
-        "from": "python/dist/siat_automation",
-        "to": "backend/siat_automation"
-      }
-    ],
     "linux": {
       "target": "AppImage",
       "icon": "assets/icon.png",
-      "category": "Office"
+      "category": "Office",
+      "extraResources": [
+        { "from": "python/dist/backend", "to": "backend/backend" },
+        { "from": "python/dist/siat_automation", "to": "backend/siat_automation" }
+      ]
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico",
+      "extraResources": [
+        { "from": "python/dist/backend.exe", "to": "backend/backend.exe" },
+        { "from": "python/dist/siat_automation.exe", "to": "backend/siat_automation.exe" }
+      ]
     }
   },
   "dependencies": {

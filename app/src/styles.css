@@ -776,6 +776,35 @@ body {
   letter-spacing: 2px;
 }
 
+.status-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.status-tab {
+  padding: 6px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.status-tab:hover {
+  color: var(--text-secondary);
+  border-color: var(--accent-light);
+}
+
+.status-tab.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 .company-tab {
   display: flex;
   flex-direction: column;
