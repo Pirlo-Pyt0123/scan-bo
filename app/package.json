@@ -6,7 +6,6 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "postinstall": "node scripts/postinstall.js",
     "build:backend": "node scripts/build-python.js backend",
     "build:siat": "node scripts/build-python.js siat",
     "dist:linux": "pnpm run build:backend && pnpm run build:siat && electron-builder --linux AppImage",
@@ -48,8 +47,5 @@
         { "from": "python/dist/siat_automation.exe", "to": "backend/siat_automation.exe" }
       ]
     }
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.11.1"
   }
 }
